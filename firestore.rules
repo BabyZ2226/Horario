@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3 Primitives
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Validation Helpers
+    function isValidSubject(data) {
+      return data.keys().hasAll(['name', 'color', 'ownerId']) &&
+             data.keys().size() <= 7 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.color is string && data.color.size() <= 20 &&
+             (data.get('teacher', '') is string && data.get('teacher', '').size() <= 100) &&
+             (data.get('room', '') is string && data.get('room', '').size() <= 50) &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['subjectId', 'dayOfWeek', 'startTime', 'endTime', 'ownerId']) &&
+             data.keys().size() <= 7 &&
+             data.subjectId is string && isValidId(data.subjectId) &&
+             data.dayOfWeek is int && data.dayOfWeek >= 0 && data.dayOfWeek <= 6 &&
+             data.startTime is string && data.startTime.matches('^[0-9]{2}:[0-9]{2}$') &&
+             data.endTime is string && data.endTime.matches('^[0-9]{2}:[0-9]{2}$') &&
+             data.ownerId == request.auth.uid;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['title', 'subjectId', 'dueDate', 'completed', 'ownerId']) &&
+             data.keys().size() <= 8 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             (data.get('description', '') is string && data.get('description', '').size() <= 1000) &&
+             data.subjectId is string && isValidId(data.subjectId) &&
+             data.dueDate is string && data.dueDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+             data.completed is bool &&
+             data.ownerId == request.auth.uid;
+    }
+
+    // User Data collections
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      
+      match /subjects/{subjectId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(subjectId) && isValidSubject(incoming());
+        allow update: if isOwner(userId) && isValidSubject(incoming()) && 
+                        incoming().ownerId == existing().get('ownerId', request.auth.uid);
+        allow delete: if isOwner(userId);
+      }
+      
+      match /sessions/{sessionId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(sessionId) && isValidSession(incoming());
+        allow update: if isOwner(userId) && isValidSession(incoming()) && 
+                        incoming().ownerId == existing().get('ownerId', request.auth.uid);
+        allow delete: if isOwner(userId);
+      }
+      
+      match /tasks/{taskId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(taskId) && isValidTask(incoming());
+        allow update: if isOwner(userId) && isValidTask(incoming()) && 
+                        incoming().ownerId == existing().get('ownerId', request.auth.uid);
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

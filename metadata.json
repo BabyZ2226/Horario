@@ -1,0 +1,6 @@
+{
+  "name": "Horario Escolar",
+  "description": "App para gestionar horarios de clases y un calendario de tareas escolares.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Subject": {
+      "title": "Subject",
+      "description": "Una materia o asignatura escolar.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Nombre de la materia" },
+        "color": { "type": "string", "description": "Color identificador" },
+        "teacher": { "type": "string", "description": "Nombre del profesor" },
+        "room": { "type": "string", "description": "Aula o salón" },
+        "ownerId": { "type": "string", "description": "UID del usuario propietario" }
+      },
+      "required": ["name", "color", "ownerId"]
+    },
+    "ClassSession": {
+      "title": "Class Session",
+      "description": "Una sesión o clase programada.",
+      "type": "object",
+      "properties": {
+        "subjectId": { "type": "string", "description": "ID de la materia" },
+        "dayOfWeek": { "type": "number", "description": "0-6 (Dom-Sáb)" },
+        "startTime": { "type": "string", "description": "HH:mm" },
+        "endTime": { "type": "string", "description": "HH:mm" },
+        "ownerId": { "type": "string", "description": "UID del usuario propietario" }
+      },
+      "required": ["subjectId", "dayOfWeek", "startTime", "endTime", "ownerId"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Una tarea o deber escolar.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Título de la tarea" },
+        "description": { "type": "string", "description": "Descripción detallada" },
+        "subjectId": { "type": "string", "description": "ID de la materia" },
+        "dueDate": { "type": "string", "description": "Fecha de entrega YYYY-MM-DD" },
+        "completed": { "type": "boolean", "description": "Estado de completado" },
+        "ownerId": { "type": "string", "description": "UID del usuario propietario" }
+      },
+      "required": ["title", "subjectId", "dueDate", "completed", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Materias del usuario"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "ClassSession",
+      "description": "Sesiones de clase del usuario"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tareas del usuario"
+    }
+  }
+}
