@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ClassSession } from '../types';
 import { colorMap, cn } from '../lib/utils';
-import { Clock, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, MapPin, ChevronLeft, ChevronRight, Download, Upload } from 'lucide-react';
 import { useSchool } from '../context/SchoolContext';
 
 interface ScheduleViewProps {
@@ -22,12 +22,56 @@ const TIME_SLOTS = [
 ];
 
 export function ScheduleView({ onEditSession, onAddAt }: ScheduleViewProps) {
-  const { subjects, schedule } = useSchool();
+  const { subjects, schedule, tasks, importData } = useSchool();
   const getSubject = (id: string) => subjects.find((s) => s.id === id);
   
   const today = new Date().getDay();
   const defaultDay = today >= 1 && today <= 5 ? today : 1;
   const [activeDay, setActiveDay] = useState(defaultDay);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExport = () => {
+    const data = {
+      subjects,
+      schedule,
+      tasks
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `horario_escolar_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.subjects && data.schedule && data.tasks) {
+          await importData(data);
+          alert('Horario importado correctamente.');
+        } else {
+          alert('El archivo no tiene el formato correcto.');
+        }
+      } catch (err) {
+        console.error('Error al importar:', err);
+        alert('Hubo un error al procesar el archivo.');
+      } finally {
+        setIsImporting(false);
+        e.target.value = ''; // Reset input
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const renderDayColumn = (day: typeof DAYS[0], isMobile: boolean = false) => (
     <div key={day.value} className={cn("relative border-r last:border-r-0 border-slate-200", isMobile ? "col-span-3" : "col-span-1")}>
@@ -105,6 +149,28 @@ export function ScheduleView({ onEditSession, onAddAt }: ScheduleViewProps) {
 
   return (
     <div className="w-full max-w-6xl mx-auto overflow-x-hidden md:overflow-x-auto pb-8">
+      {/* Top Actions */}
+      <div className="flex gap-2 mb-4 justify-end">
+        <button 
+          onClick={handleExport}
+          className="flex items-center justify-center gap-2 px-3 py-1.5 bg-white text-slate-600 text-sm font-medium rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Exportar</span>
+        </button>
+        <label className="flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg border border-slate-200 shadow-sm hover:bg-slate-200 transition-colors cursor-pointer disabled:opacity-50">
+          <Upload className={cn("w-3.5 h-3.5", isImporting && "animate-spin")} />
+          <span>{isImporting ? 'Importando...' : 'Importar'}</span>
+          <input 
+            type="file" 
+            accept=".json" 
+            className="hidden" 
+            onChange={handleImport} 
+            disabled={isImporting} 
+          />
+        </label>
+      </div>
+
       {/* Mobile Day Selector */}
       <div className="md:hidden flex items-center justify-between bg-white p-2 mb-4 rounded-xl shadow-sm border border-slate-200">
         <button 

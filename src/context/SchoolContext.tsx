@@ -35,6 +35,7 @@ interface SchoolContextType {
   addTask: (task: Omit<Task, 'id'>) => Promise<void>;
   updateTask: (id: string, task: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  importData: (data: { subjects: Subject[], schedule: ClassSession[], tasks: Task[] }) => Promise<void>;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
@@ -312,6 +313,38 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const importData = async (data: { subjects: Subject[], schedule: ClassSession[], tasks: Task[] }) => {
+    // Clear old data first if user wishes, or just merge. 
+    // Usually import means "Restore", so let's overwrite or add.
+    // If user is logged in, we upload to Firestore.
+    if (user) {
+      // For Firestore, we add everything one by one (or batch). 
+      // To keep it simple and consistent with existing patterns:
+      for (const s of data.subjects) {
+        const { id, ...rest } = s;
+        await addSubject(rest, id);
+      }
+      for (const s of data.schedule) {
+        // We use setDoc here to preserve IDs if possible, or just use addSession
+        const path = `users/${user.uid}/sessions/${s.id}`;
+        const { id: _removedId, ownerId: _removedOwner, ...cleanSession } = s as any;
+        await setDoc(doc(db, path), { ...cleanSession, ownerId: user.uid });
+      }
+      for (const t of data.tasks) {
+        const path = `users/${user.uid}/tasks/${t.id}`;
+        const { id: _removedId, ownerId: _removedOwner, ...cleanTask } = t as any;
+        await setDoc(doc(db, path), { ...cleanTask, ownerId: user.uid });
+      }
+    } else {
+      setSubjects(data.subjects);
+      setSchedule(data.schedule);
+      setTasks(data.tasks);
+      localStorage.setItem('school_subjects', JSON.stringify(data.subjects));
+      localStorage.setItem('school_schedule', JSON.stringify(data.schedule));
+      localStorage.setItem('school_tasks', JSON.stringify(data.tasks));
+    }
+  };
+
 
   return (
     <SchoolContext.Provider value={{
@@ -320,7 +353,8 @@ export function SchoolProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle, logOut,
       addSubject, updateSubject, deleteSubject,
       addSession, updateSession, deleteSession,
-      addTask, updateTask, deleteTask
+      addTask, updateTask, deleteTask,
+      importData
     }}>
       {children}
     </SchoolContext.Provider>
